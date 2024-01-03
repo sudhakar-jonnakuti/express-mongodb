@@ -1,0 +1,74 @@
+version: "3"
+
+services:
+  mongodb:
+    image: mongo
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: pass
+    volumes:
+      - mongo-volume:/data/db
+      - mongo-config-volume:/data/configdb
+    networks:
+      - app-network
+
+  mongo-express:
+    depends_on:
+      - mongodb
+    image: mongo-express
+    container_name: mongo-express
+    restart: always
+    ports:
+      - "8084:8081"
+    expose:
+      - "8084"
+    environment:
+      ME_CONFIG_OPTIONS_EDITORTHEME: ambiance
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: pass
+      ME_CONFIG_MONGODB_SERVER: mongodb
+    networks:
+      - app-network
+
+  express-mongodb:
+    depends_on:
+      - mongodb
+    build:
+      context: .
+      dockerfile: developer.dockerfile
+    image: express-mongodb
+    container_name: express-mongodb
+    ports:
+      - "5000:5000"
+    environment:
+      APP_PORT: 5000
+      MONGO_SERVICE: mongodb
+      MONGO_USERNAME: admin
+      MONGO_PASSWORD: pass
+      MONGO_PATH: mongodb:27017
+    volumes:
+      - .:/home/node/app
+      - node_modules:/home/node/app/node_modules
+    command: >
+      bash -c "
+        npm run app:typecheck
+        npm run app:lint
+        npm run app:build
+        npm run app:start:dev
+      "
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo-volume:
+  mongo-config-volume:
+  node_modules:
